@@ -1,0 +1,155 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <fcntl.h>
+#include <sys/types.h> 
+#include <sys/wait.h>
+#include <sys/stat.h> 
+#include "figlio.h"
+#include <signal.h>
+
+#define FILE_MODE (S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)
+
+#define rosso "\x1b[31m"
+#define verde "\x1b[32m"
+#define giallo "\x1b[33m"
+#define blu "\x1b[34m"
+#define magenta "\x1b[35m"
+#define azzurro "\x1b[36m"
+#define reset "\x1b[0m"
+
+#define boldblu    "\033[1m\033[34m"
+
+const int STR_LENGTH = 256;
+
+/*void handler(int sig)
+{
+	printf("ATTIVAZIONE!\n");
+	fprintf(stderr, "attivazione\n");
+}*/
+
+void main_figlio(char* nome)
+{
+	int i = 1;
+	char nomeProcesso[STR_LENGTH];
+	char nomeFifo[STR_LENGTH];
+	char msg[STR_LENGTH];
+	char buffer[STR_LENGTH];
+	//strcpy(nomeProcesso, nome);
+	//strcpy(nomeFifo, "tmp/");
+	strcpy(msg,"");
+	//printf("NOME PROCESSO: %s\n", nome);
+	//strcat(nomeFifo, nome);
+	//strcat(nomeFifo, ".fifo");
+	//mkfifo(nomeFifo, FILE_MODE);
+	
+	int fifo = open("tmp/scrittura", O_RDONLY);
+	//printf("fifo\n");
+	int chiusura = 0;
+	
+	//signal(SIGCONT, handler);
+
+	do{
+		kill(getpid(), SIGSTOP);
+		//printf("partito: %s\n", nome);
+		char* ist;
+		int length = (int)read(fifo, msg, STR_LENGTH);
+		msg[length]='\0';
+		//printf("msg: %s - proc: %s\n", msg, nome);
+		ist = strtok(msg, " ");
+		//printf("mess:%s\n", ist);
+		//printf("LEGGO: %s\t length: %d\n", msg, (int)strlen(msg));
+		if(strcmp(ist, "pspawn") == 0)
+		{
+			ist = strtok(NULL, " ");
+			if(strcmp(ist, nome) == 0)
+			{
+				printf(magenta "\nClonazione del processo %s con pid %d in corso...\n" reset, nome, getpid());
+				char num[STR_LENGTH];
+				sprintf(num, "%d", i);
+				strcpy(buffer, nome);
+				strcat(buffer, "_");
+				strcat(buffer, num);
+				
+				clonazione(buffer);
+				i++;
+			}
+		}
+		else if(strcmp(ist, "pclose")== 0)
+		{
+			ist = strtok(NULL, " ");
+			if(strcmp(ist, nome) == 0)
+			{
+				chiusura = 1;
+				printf(magenta "Il processo %s con pid %d si sta chiudendo... Attendere\n"reset, nome, getpid());
+			}
+		}
+		else if(strcmp(ist, "prmall") == 0)
+		{
+			
+			ist = strtok(NULL, " ");
+			//printf("%s\n", ist);
+			if(strcmp(ist, nome) == 0)
+			{
+				//printf("nome: %s\n", ist);
+				ist = strtok(NULL, " ");
+				//printf("pidf: %s\n", ist);
+				waitpid(atoi(ist), NULL, 0);
+			}
+		}
+		else if(strcmp(ist, "pinfo") == 0)
+		{
+			ist = strtok(NULL, " ");
+			if(strcmp(ist, nome) == 0)
+			{
+				printf(boldblu"Nome: " reset);
+				printf(blu "%s\n" reset, nome);
+				printf(boldblu"Pid: "reset);
+				printf( blu "%d\n" reset, getpid());
+				printf(boldblu"Ppid: "reset);
+				printf(blu "%d\n" reset, getppid());
+				printf(boldblu"Pgid: "reset);
+				printf(blu "%d\n" reset, getpgid(getpid()));
+				printf(reset);
+			}
+		}
+		else if(strcmp(ist, "pchname") == 0)
+		{
+			printf(magenta"Cambio del nome %s in ", nome);
+			ist = strtok(NULL, " ");	
+			printf("ist: %s\n", ist);
+			if(strcmp(ist, nome) == 0)
+			{
+				ist =  strtok(NULL, " ");
+				printf("nomeClone: %s\n", ist);
+				strcpy(nome, ist);
+				printf("%s in corso... Attendere" reset, nome);
+			
+			}
+			printf("nomeFiglio: %s\n", nome);
+		}
+	}while(!chiusura);
+		
+	kill(getpid(), SIGINT);
+}
+
+
+void clonazione(char* nome)
+{
+	int fifo = open("tmp/lettura", O_WRONLY);
+	char buffer[STR_LENGTH]; 
+	int pid = fork();
+	if(pid == 0)
+	{
+		printf("\nIl clone %s è stato creato con SUCCESSO con il pid %d!\n\n", nome, getpid());
+		sprintf(buffer, "%d", getpid());
+		write(fifo, buffer, strlen(buffer));
+		close(fifo);
+		main_figlio(nome);
+	}
+	else if(pid < 1)
+	{
+		printf(rosso "\nIl processo clone %s non è stato creato a causa di un errore!\n" reset, nome);
+	}
+}

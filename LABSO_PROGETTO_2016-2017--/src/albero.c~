@@ -1,0 +1,271 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+#include <sys/types.h>
+#include "albero.h"
+
+int d = 0;
+char nColore[256];
+char colore[256];
+
+#define rosso "\x1b[31m"
+#define verde "\x1b[32m"
+#define giallo 1"\x1b[33m"
+#define blu "\x1b[34m"
+#define magenta "\x1b[35m"
+#define azzurro "\x1b[36m"
+#define reset "\x1b[0m"
+
+struct processo* inizializza()
+{
+	struct processo* radice = (struct processo*) malloc(sizeof(struct processo));
+	radice->vivo = 1;
+	radice->pid = getpid();
+	radice->figli = 0;
+	radice->padre = NULL;
+	radice->fratello = NULL;
+	radice->figlio = NULL;
+	strcpy(radice->nome, "shell custom");
+	return radice;
+}
+
+void inserisciFiglio(struct processo* padre, struct processo* figlio)
+{
+	if(padre->figlio == NULL)
+	{
+		padre->figlio = figlio;
+	}
+	else
+	{
+		struct processo* supporto = padre->figlio;
+		while(supporto->fratello != NULL)
+		{
+			supporto =  supporto->fratello;
+		}
+	
+		supporto->fratello = figlio;
+	}
+
+	padre->figli = padre->figli+1;
+}
+
+void eliminaFiglio(char* nome, struct processo* radice)
+{
+	
+	struct processo* p = cerca(nome, radice);
+
+	p->vivo = 0;
+
+	/*if(p==NULL){
+		printf("Nodo non trovato");
+		return;
+	}
+	struct processo* padre = p->padre;
+
+	struct processo* f = padre->figlio;
+
+	printf("da eliminare: %s", p->nome);
+
+	if(f == p)//SE PRIMO FIGLIO
+	{
+		p->vivo = 0;
+		//padre->figlio = p->fratello;
+	}
+	else
+	{
+		while(f->fratello != p)
+		{
+			f = f->fratello;
+		}
+		
+		f->fratello = p->fratello;
+	}	
+	
+	inserisciFiglio(padre, p->figlio);
+	padre->figli = padre->figli -1;
+	free(p);
+	
+	printf("figlio eliminato\n");*/
+}
+
+struct processo* cerca(char* nome, struct processo* p)
+{
+	if(p == NULL)
+	{
+		return(NULL);
+	}
+	if(strcmp(p->nome, nome) == 0)
+	{
+		return(p);
+	}
+	else
+	{
+		struct processo* ris = cerca(nome, p->figlio);
+		if(ris == NULL)
+		{
+			ris = cerca(nome, p->fratello);
+		}
+
+		return(ris);
+	}
+}
+
+void stampaSpazi() {
+
+	int i = 0;	
+	while(i < d)
+	{	
+		//printf("\t");
+		printf("  ");
+		i++;
+	}	
+		
+}
+
+void stampaAlbero(struct processo* albero)
+{
+ 	if(albero != NULL)
+	{
+		if(strcmp(albero->nome, "shell custom") != 0)
+		{
+			if(albero-> vivo == 0)
+			{
+				printf("LIVELLO %d: %s - %d - TERMINATO\n" , d, albero->nome, albero->pid);
+				d++;
+				stampaAlbero(albero->figlio);
+				d--;
+				stampaAlbero(albero->fratello);
+			}
+			else
+			{
+				strcpy(colore, "\033[3");
+				strcpy(nColore, "");
+				sprintf(nColore, "%d", (d%5) + 1);
+				strcat(colore, nColore);
+				strcat(colore, "m");
+
+				printf("%sLIVELLO %d: %s - %d\n" reset,colore, d, albero->nome, albero->pid);
+				d++;
+				stampaAlbero(albero->figlio);
+				d--;
+				stampaAlbero(albero->fratello);
+			}
+		}
+		else
+		{
+			printf(azzurro "\nLIVELLO %d: %s - %d\n" reset , d, albero->nome, albero->pid);
+			d++;
+			stampaAlbero(albero->figlio);
+			d--;
+		}
+	}
+	
+	printf(reset);
+}
+
+void stampaLivelli(struct processo* albero)
+{
+	if(albero != NULL)
+	{
+		if(strcmp(albero->nome, "shell custom") != 0)
+		{
+			if(albero-> vivo == 0)
+			{
+				stampaSpazi();
+				printf("LIVELLO %d: %s - %d - TERMINATO\n" , d, albero->nome, albero->pid);
+				d++;
+				stampaLivelli(albero->figlio);
+				d--;
+				stampaLivelli(albero->fratello);
+			}
+			else
+			{
+				stampaSpazi();
+				strcpy(colore, "\033[3");
+				strcpy(nColore, "");
+				sprintf(nColore, "%d", (d%5) + 1);
+				strcat(colore, nColore);
+				strcat(colore, "m");
+
+				printf("%sLIVELLO %d: %s - %d\n" reset,colore, d, albero->nome, albero->pid);
+				d++;
+				stampaLivelli(albero->figlio);
+				d--;
+				stampaLivelli(albero->fratello);
+			}
+		}
+		else
+		{
+			printf(azzurro "\nLIVELLO %d: %s - %d\n" reset , d, albero->nome, albero->pid);
+			d++;
+			stampaLivelli(albero->figlio);
+			d--;
+		}
+	}
+	
+	printf(reset);
+}
+
+
+
+void stampaLista(struct processo* p)
+{
+	if(p == NULL)
+	{
+		return;
+	}
+	else
+	{
+		if(p->padre != NULL)
+		{
+			if(p->vivo == 1)
+			{
+				printf("- processo: ");
+				printf("\033[1m\033[34m""p%s\n" reset, p->nome);	
+			}
+			else
+			{
+				printf("- processo: ");
+				printf("\033[1m\033[31m""%s\tTERMINATO\n" reset , p->nome);
+			}
+			stampaLista(p->fratello);
+			stampaLista(p->figlio);
+		}
+		else
+		{
+			stampaLista(p->fratello);
+			stampaLista(p->figlio);	
+		}
+	}	
+}
+
+void stampaListaDettagliata(struct processo* p)
+{
+	if(p == NULL)
+	{
+		return;
+	}
+	else
+	{
+		if(p->padre != NULL)
+		{
+			if(p->vivo == 1)
+			{
+				printf(verde"%s\t\t%d\t\tATTIVO\n" reset, p->nome, p->pid);	
+			}
+			else
+			{
+				printf(rosso"%s\t\t%d\t\tTERMINATO\n" reset, p->nome, p->pid);
+			}
+			stampaListaDettagliata(p->fratello);
+			stampaListaDettagliata(p->figlio);
+		}
+		else
+		{
+			stampaListaDettagliata(p->fratello);
+			stampaListaDettagliata(p->figlio);	
+		}
+	}	
+}

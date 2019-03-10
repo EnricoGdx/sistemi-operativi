@@ -1,0 +1,6 @@
+#ifndef FIGLIO
+#define FIGLIO
+
+void main_figlio(char* nome, int ppid);
+void clonazione(char* nome);
+#endif
